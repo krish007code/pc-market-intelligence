@@ -5,22 +5,28 @@ token = os.environ["MOTHERDUCK_TOKEN"]
 minio_user = os.environ["MINIO_USER"]
 minio_pass = os.environ["MINIO_PASSWORD"]
 
-con = duckdb.connect(f"md:pc_market_intelligence?motherduck_token={token}")
+# Step 1: read from MinIO locally
+local = duckdb.connect()
+local.execute("INSTALL httpfs; LOAD httpfs;")
+local.execute("SET s3_region='us-east-1';")
+local.execute("SET s3_endpoint='minio:9000';")
+local.execute("SET s3_use_ssl=false;")
+local.execute("SET s3_url_style='path';")
+local.execute(f"SET s3_access_key_id='{minio_user}';")
+local.execute(f"SET s3_secret_access_key='{minio_pass}';")
 
-con.execute("INSTALL httpfs; LOAD httpfs;")
-con.execute("SET s3_region='us-east-1';")
-con.execute("SET s3_endpoint='minio:9000';")
-con.execute("SET s3_use_ssl=false;")
-con.execute("SET s3_url_style='path';")
-con.execute(f"SET s3_access_key_id='{minio_user}';")
-con.execute(f"SET s3_secret_access_key='{minio_pass}';")
-
-con.execute("""
-    CREATE OR REPLACE TABLE laptops AS
+df = local.execute("""
     SELECT * FROM read_parquet(
         's3://pc-parts-bronze/laptops/**/*.parquet',
         union_by_name = true
     )
-""")
-print("Sync complete:", con.execute("SELECT COUNT(*) FROM laptops").fetchone())
-con.close()
+""").df()
+
+local.close()
+print(f"📦 Fetched {len(df)} rows from MinIO")
+
+# Step 2: push to MotherDuck
+md = duckdb.connect(f"md:pc_market_intelligence?motherduck_token={token}")
+md.execute("CREATE OR REPLACE TABLE laptops AS SELECT * FROM df")
+print(f"✅ Synced {len(df)} rows to MotherDuck")
+md.close()
