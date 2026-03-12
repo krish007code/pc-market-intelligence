@@ -39,12 +39,22 @@ def _base_record(name: str, price_inr: int, url: str, source: str) -> dict:
 @dlt.resource(name="md_laptop_links", write_disposition="replace")
 def get_md_laptop_links():
     url = "https://mdcomputers.in/catalog/laptop"
-    response = requests.get(url, headers=COMMON_HEADERS, timeout=15)
-    soup = BeautifulSoup(response.text, "html.parser")
-    for p in soup.find_all("h3", class_="product-entities-title"):
-        link_tag = p.find("a", href=True)
-        if link_tag:
-            yield link_tag["href"]
+    try:
+        # ADD TIMEOUT HERE (10 seconds)
+        response = requests.get(url, headers=COMMON_HEADERS, timeout=10)
+        soup = BeautifulSoup(response.text, "html.parser")
+        
+        links = []
+        for p in soup.find_all("h3", class_="product-entities-title"):
+            link_tag = p.find("a", href=True)
+            if link_tag:
+                links.append(link_tag["href"])
+        
+        # STOP at 20 laptops so the script actually ends
+        return links[:20] 
+    except requests.exceptions.Timeout:
+        print("⏰ MD Computers timed out! Skipping...")
+        return []
 
 @dlt.transformer(data_from=get_md_laptop_links, name="md_laptop_details")
 def get_md_laptop_specs(product_url: str):
