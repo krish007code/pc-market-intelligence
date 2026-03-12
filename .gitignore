@@ -1,0 +1,14 @@
+# Data & DBs
+*.duckdb
+*.parquet
+*.csv
+.dlt/
+
+# Environment & Secrets
+.env
+secrets.toml
+
+# Python
+__pycache__/
+.venv/
+.pytest_cache/
