@@ -35,10 +35,44 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     ports:
       - "9000:9000"
-      - "9001:9001" 
+      - "9001:9001"
     volumes:
       - minio_data:/data
     command: server /data --console-address ":9001"
+
+  # One-shot service: builds and tags the ingestion image on the host Docker
+  # daemon using dockerfile_inline — no separate Dockerfile needed.
+  # Kestra shares the host socket (/var/run/docker.sock) so the image is
+  # instantly available to every task container it spawns.
+  ingestion_image_builder:
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM python:3.11-slim
+        # 1. Install essential system tools
+        RUN apt-get update && apt-get install -y \
+            curl \
+            && rm -rf /var/lib/apt/lists/*
+        
+        # 2. Install Python packages (including Playwright and dlt)
+        RUN pip install --no-cache-dir \
+            "dlt[s3,parquet]" \
+            requests \
+            beautifulsoup4 \
+            playwright \
+            minio \
+            pandas \
+            pyarrow
+
+        # 3. Install Playwright Browsers AND their System Dependencies
+        # The '--with-deps' flag is the secret to getting the correct Linux libs
+        RUN playwright install chromium --with-deps
+        
+        WORKDIR /app
+    image: pc-pipeline-ingestion:latest
+    command: echo "Image pc-pipeline-ingestion:latest is ready."
+    networks:
+      - data_pipeline_net
 
   kestra:
     image: kestra/kestra:latest
@@ -51,6 +85,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      ingestion_image_builder:
+        condition: service_completed_successfully
     ports:
       - "8080:8080"
     extra_hosts:
@@ -58,7 +94,6 @@ services:
     environment:
       ENV_MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       ENV_MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-
       KESTRA_CONFIGURATION: |
         kestra:
           repository:
@@ -69,17 +104,13 @@ services:
             type: local
             local:
               basePath: /app/storage
-          
-          # Enable KV store features
           variables:
             enabled: true
-
           ai:
             type: gemini
             gemini:
               model-name: gemini-2.5-flash
               api-key: "${GEMINI_API_KEY}"
-        
         datasources:
           postgres:
             url: jdbc:postgresql://postgres:5432/kestra
