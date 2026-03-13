@@ -63,6 +63,7 @@ services:
             minio \
             pandas \
             duckdb \
+            boto3 \
             pyarrow
 
         # 3. Install Playwright Browsers AND their System Dependencies
