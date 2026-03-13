@@ -62,6 +62,7 @@ services:
             playwright \
             minio \
             pandas \
+            duckdb \
             pyarrow
 
         # 3. Install Playwright Browsers AND their System Dependencies
@@ -91,7 +92,14 @@ services:
       - "8080:8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    deploy:
+      resources:
+        limits:
+          memory: 4G # Limit Kestra so it doesn't starve your host
+          
     environment:
+      # This is crucial for Java apps in Docker
+      JAVA_OPTS: "-Xmx2g" 
       ENV_MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       ENV_MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
       KESTRA_CONFIGURATION: |
