@@ -62,7 +62,7 @@ services:
             playwright \
             minio \
             pandas \
-            duckdb \
+            duckdb==1.4.4 \
             boto3 \
             pyarrow
 
