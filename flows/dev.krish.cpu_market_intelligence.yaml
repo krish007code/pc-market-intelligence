@@ -1,0 +1,71 @@
+id: cpu_market_intelligence
+namespace: dev.krish
+
+tasks:
+  - id: wdir
+    type: io.kestra.plugin.core.flow.WorkingDirectory
+    tasks:
+      - id: git_clone_repo
+        type: io.kestra.plugin.git.Clone
+        url: https://github.com/krish007code/pc-market-intelligence.git
+        branch: main
+
+      - id: clean_bucket
+        type: io.kestra.plugin.scripts.python.Commands
+        containerImage: pc-pipeline-ingestion:latest
+        taskRunner:
+          type: io.kestra.plugin.scripts.runner.docker.Docker
+          networkMode: pc_pipeline_data_pipeline_net
+        env:
+          MINIO_USER: "{{ envs.minio_root_user }}"
+          MINIO_PASSWORD: "{{ envs.minio_root_password }}"
+        commands:
+          - |
+            python - <<'EOF'
+            import boto3, os
+
+            s3 = boto3.client(
+                "s3",
+                endpoint_url="http://minio:9000",
+                aws_access_key_id=os.environ["MINIO_USER"],
+                aws_secret_access_key=os.environ["MINIO_PASSWORD"],
+            )
+
+            bucket = "pc-parts-bronze"
+            prefix = "cpus/"
+
+            paginator = s3.get_paginator("list_objects_v2")
+            objects = [
+                {"Key": obj["Key"]}
+                for page in paginator.paginate(Bucket=bucket, Prefix=prefix)
+                for obj in page.get("Contents", [])
+            ]
+
+            if objects:
+                s3.delete_objects(Bucket=bucket, Delete={"Objects": objects})
+                print(f"🗑️ Deleted {len(objects)} objects from {bucket}/{prefix}")
+            else:
+                print("✅ Bucket already clean")
+            EOF
+
+      - id: python_ingestion
+        type: io.kestra.plugin.scripts.python.Commands
+        containerImage: pc-pipeline-ingestion:latest
+        taskRunner:
+          type: io.kestra.plugin.scripts.runner.docker.Docker
+          networkMode: pc_pipeline_data_pipeline_net
+        env:
+          DESTINATION__S3__ACCESS_KEY_ID: "{{ envs.minio_root_user }}"
+          DESTINATION__S3__SECRET_ACCESS_KEY: "{{ envs.minio_root_password }}"
+          DESTINATION__S3__BUCKET_NAME: "pc-parts-bronze"
+          MOTHERDUCK_TOKEN: "{{ kv('motherduck_token') }}"
+          MINIO_USER: "{{ envs.minio_root_user }}"
+          MINIO_PASSWORD: "{{ envs.minio_root_password }}"
+        commands:
+          - python cpu_ingest.py
+          - python motherduck_sync_cpu.py
+
+triggers:
+  - id: hourly_scrape
+    type: io.kestra.plugin.core.trigger.Schedule
+    cron: "0 * * * *"

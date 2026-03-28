@@ -1,0 +1,8 @@
+name: "pc-market-intelligence"
+default_environment: "default"
+environments:
+  default:
+    connections:
+      duckdb:
+        - name: "motherduck"
+          path: "md:pc_market_intelligence?motherduck_token={{ env.MOTHERDUCK_TOKEN }}"

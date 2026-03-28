@@ -1,0 +1,57 @@
+id: pc_market_intelligence
+namespace: dev.krish
+
+tasks:
+  - id: wdir
+    type: io.kestra.plugin.core.flow.WorkingDirectory
+    tasks:
+      - id: git_clone_repo
+        type: io.kestra.plugin.git.Clone
+        url: https://github.com/krish007code/pc-market-intelligence.git
+        branch: main
+
+      - id: python_ingestion
+        type: io.kestra.plugin.scripts.python.Commands
+        containerImage: python:3.11-slim
+        taskRunner:
+          type: io.kestra.plugin.scripts.runner.docker.Docker
+          networkMode: pc_pipeline_data_pipeline_net
+
+        env:
+          DESTINATION__S3__ACCESS_KEY_ID: "{{ envs.minio_root_user }}"
+          DESTINATION__S3__SECRET_ACCESS_KEY: "{{ envs.minio_root_password }}"
+          DESTINATION__S3__BUCKET_NAME: "pc-parts-bronze"
+
+          DESTINATION__S3__ENDPOINT_URL: "http://minio:9000"
+        commands:
+          - pip install --quiet "dlt[s3,parquet]" requests beautifulsoup4
+          - python ingestion.py
+
+  - id: duckdb_sync
+    type: io.kestra.plugin.jdbc.duckdb.Query
+    url: "jdbc:duckdb:md:pc_market_intelligence?motherduck_token={{ kv('motherduck_token') }}"
+    fetchType: NONE
+    sql: |
+      INSTALL httpfs;
+      LOAD httpfs;
+
+      SET s3_region='us-east-1';
+      SET s3_endpoint='minio:9000';
+      SET s3_use_ssl=false;
+      SET s3_url_style='path';
+      SET s3_access_key_id='{{ envs.minio_root_user }}';
+      SET s3_secret_access_key='{{ envs.minio_root_password }}';
+
+      -- Since we are already connected to 'md:pc_market_intelligence' via the URL,
+      -- we just need to ensure the table is updated.
+      CREATE OR REPLACE TABLE monitors AS
+      SELECT * FROM read_parquet(
+        's3://pc-parts-bronze/monitors/**/*.parquet',
+        union_by_name = true
+      );
+
+triggers:
+  - id: hourly_scrape
+    type: io.kestra.plugin.core.trigger.Schedule
+    cron: "0 * * * *"
+

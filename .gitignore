@@ -1,3 +1,16 @@
+# Local DuckDB (Catching the specific name you use)
+duckdb.db
+duckdb.db.wal
+
+# Python version management
+.python-version
+
+# Temporary/Backup files
+*.backup
+*.csv
+# This catches that weird malformed motherduck file if you haven't deleted it yet
+md:*
+
 # Data & DBs
 *.duckdb
 *.parquet
@@ -12,3 +25,8 @@ secrets.toml
 __pycache__/
 .venv/
 .pytest_cache/
+.bruin.yml
+logs/runs
+logs/*.log
+*.py[cod]
+logs/queries
