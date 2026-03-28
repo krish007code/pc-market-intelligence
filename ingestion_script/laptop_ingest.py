@@ -57,8 +57,8 @@ def get_md_laptop_links():
             if link_tag:
                 links.append(link_tag["href"])
         
-        # STOP at 20 laptops so the script actually ends
-        return links[:20] 
+        # STOP at 30 laptops so the script actually ends
+        return links[:30] 
     except requests.exceptions.Timeout:
         print("⏰ MD Computers timed out! Skipping...")
         return []

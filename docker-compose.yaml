@@ -129,5 +129,5 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - kestra_data:/app/storage
-      - .:/app/scripts
+      - ./scripts:/app/scripts
       - ./duckdb.db:/app/duckdb.db
