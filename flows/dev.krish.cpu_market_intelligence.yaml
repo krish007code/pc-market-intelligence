@@ -62,8 +62,8 @@ tasks:
           MINIO_USER: "{{ envs.minio_root_user }}"
           MINIO_PASSWORD: "{{ envs.minio_root_password }}"
         commands:
-          - python cpu_ingest.py
-          - python motherduck_sync_cpu.py
+          - python ingestion_script/cpu_ingest.py
+          - python sync_script/motherduck_sync_cpu.py
 
 triggers:
   - id: hourly_scrape

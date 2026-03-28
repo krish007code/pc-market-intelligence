@@ -10,48 +10,62 @@ tasks:
         url: https://github.com/krish007code/pc-market-intelligence.git
         branch: main
 
-      - id: python_ingestion
+      - id: clean_bucket
         type: io.kestra.plugin.scripts.python.Commands
-        containerImage: python:3.11-slim
+        containerImage: pc-pipeline-ingestion:latest
         taskRunner:
           type: io.kestra.plugin.scripts.runner.docker.Docker
           networkMode: pc_pipeline_data_pipeline_net
+        env:
+          MINIO_USER: "{{ envs.minio_root_user }}"
+          MINIO_PASSWORD: "{{ envs.minio_root_password }}"
+        commands:
+          - |
+            python - <<'EOF'
+            import boto3, os
 
+            s3 = boto3.client(
+                "s3",
+                endpoint_url="http://minio:9000",
+                aws_access_key_id=os.environ["MINIO_USER"],
+                aws_secret_access_key=os.environ["MINIO_PASSWORD"],
+            )
+
+            bucket = "pc-parts-bronze"
+            prefix = "monitors/"
+
+            paginator = s3.get_paginator("list_objects_v2")
+            objects = [
+                {"Key": obj["Key"]}
+                for page in paginator.paginate(Bucket=bucket, Prefix=prefix)
+                for obj in page.get("Contents", [])
+            ]
+
+            if objects:
+                s3.delete_objects(Bucket=bucket, Delete={"Objects": objects})
+                print(f"🗑️ Deleted {len(objects)} objects from {bucket}/{prefix}")
+            else:
+                print("✅ Bucket already clean")
+            EOF
+
+      - id: python_ingestion
+        type: io.kestra.plugin.scripts.python.Commands
+        containerImage: pc-pipeline-ingestion:latest
+        taskRunner:
+          type: io.kestra.plugin.scripts.runner.docker.Docker
+          networkMode: pc_pipeline_data_pipeline_net
         env:
           DESTINATION__S3__ACCESS_KEY_ID: "{{ envs.minio_root_user }}"
           DESTINATION__S3__SECRET_ACCESS_KEY: "{{ envs.minio_root_password }}"
           DESTINATION__S3__BUCKET_NAME: "pc-parts-bronze"
-
-          DESTINATION__S3__ENDPOINT_URL: "http://minio:9000"
+          MOTHERDUCK_TOKEN: "{{ kv('motherduck_token') }}"
+          MINIO_USER: "{{ envs.minio_root_user }}"
+          MINIO_PASSWORD: "{{ envs.minio_root_password }}"
         commands:
-          - pip install --quiet "dlt[s3,parquet]" requests beautifulsoup4
-          - python ingestion.py
-
-  - id: duckdb_sync
-    type: io.kestra.plugin.jdbc.duckdb.Query
-    url: "jdbc:duckdb:md:pc_market_intelligence?motherduck_token={{ kv('motherduck_token') }}"
-    fetchType: NONE
-    sql: |
-      INSTALL httpfs;
-      LOAD httpfs;
-
-      SET s3_region='us-east-1';
-      SET s3_endpoint='minio:9000';
-      SET s3_use_ssl=false;
-      SET s3_url_style='path';
-      SET s3_access_key_id='{{ envs.minio_root_user }}';
-      SET s3_secret_access_key='{{ envs.minio_root_password }}';
-
-      -- Since we are already connected to 'md:pc_market_intelligence' via the URL,
-      -- we just need to ensure the table is updated.
-      CREATE OR REPLACE TABLE monitors AS
-      SELECT * FROM read_parquet(
-        's3://pc-parts-bronze/monitors/**/*.parquet',
-        union_by_name = true
-      );
+          - python ingestion_script/ingestion.py
+          - python sync_script/motherduck_sync_monitors.py
 
 triggers:
   - id: hourly_scrape
     type: io.kestra.plugin.core.trigger.Schedule
     cron: "0 * * * *"
-
