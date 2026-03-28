@@ -1,3 +1,10 @@
+'''
+this script is written by claude ai to mimic the logic used in ingestion.py but for cpu data instead of monitors.
+It scrapes the same 2 websites (MD Computers and Prime ABGB) but goes to their CPU/Processor category pages, extracts product links,
+and then visits each product page to extract details like name, price, brand, and highlights. 
+The cleaned data is then written as Parquet files to MinIO, similar to the monitor pipeline.
+'''
+
 import os
 import re
 import time
