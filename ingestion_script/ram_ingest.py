@@ -169,7 +169,7 @@ def build_ram_pipeline() -> dlt.Pipeline:
     return dlt.pipeline(
         pipeline_name="ram_pipeline",
         destination=dlt.destinations.filesystem(
-            bucket_url=f"s3://{BUCKET_NAME}/{DATASET_NAME}",
+            bucket_url=f"s3://{BUCKET_NAME}",
             credentials={
                 "aws_access_key_id":     MINIO_USER,
                 "aws_secret_access_key": MINIO_PASS,

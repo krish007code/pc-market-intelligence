@@ -263,14 +263,16 @@ def build_cpu_pipeline() -> dlt.Pipeline:
     return dlt.pipeline(
         pipeline_name="cpu_pipeline",
         destination=dlt.destinations.filesystem(
-            bucket_url=f"s3://{BUCKET_NAME}/{DATASET_NAME}",
+            # Point to the ROOT of your data storage
+            bucket_url=f"s3://{BUCKET_NAME}", 
             credentials={
                 "aws_access_key_id":     MINIO_USER,
                 "aws_secret_access_key": MINIO_PASS,
                 "endpoint_url":          S3_ENDPOINT,
             },
         ),
-        dataset_name="bronze_layer",
+        # This will create the /bronze_layer/ folder inside the bucket
+        dataset_name="bronze_layer", 
     )
 
 # ──────────────────────────────────────────────────────────────────────────────
