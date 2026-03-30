@@ -39,7 +39,7 @@ MINIO_ENDPOINT = "minio:9000"          # Docker service name – no scheme
 # dlt writes to  s3://<bucket>/<dataset_name>/<resource_name>/...
 # bucket_url was s3://pc-parts-bronze/gpus  and  dataset_name = bronze_layer
 # so the actual prefix is:  pc-parts-bronze/gpus/bronze_layer/
-PARQUET_GLOB   = "s3://pc-parts-bronze/gpus/bronze_layer/**/*.parquet"
+PARQUET_GLOB   = "s3://pc-parts-bronze/bronze_layer/**/*.parquet"
 MOTHERDUCK_DB  = "pc_market_intelligence"
 TARGET_TABLE   = "gpus"
 

@@ -17,7 +17,7 @@ MINIO_PASS       = os.environ.get("MINIO_PASSWORD", os.environ.get("DESTINATION_
 
 MINIO_ENDPOINT = "minio:9000"          # Docker service name
 # Pattern matches dlt's layout: s3://<bucket>/<dataset_name>/<resource_name>/...
-PARQUET_GLOB   = "s3://pc-parts-bronze/laptops/bronze_layer/**/*.parquet"
+PARQUET_GLOB   = "s3://pc-parts-bronze/bronze_layer/**/*.parquet"
 MOTHERDUCK_DB  = "pc_market_intelligence"
 TARGET_TABLE   = "laptops"
 
