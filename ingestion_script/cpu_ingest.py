@@ -1,95 +1,183 @@
-'''
-this script is written by claude ai to mimic the logic used in ingestion.py but for cpu data instead of monitors.
-It scrapes the same 2 websites (MD Computers and Prime ABGB) but goes to their CPU/Processor category pages, extracts product links,
-and then visits each product page to extract details like name, price, brand, and highlights. 
-The cleaned data is then written as Parquet files to MinIO, similar to the monitor pipeline.
-'''
+"""
+cpu_ingest.py  –  Bronze-layer ingestion for CPU/Processor data.
+Scrapes MD Computers and PrimeABGB, writes Parquet files to MinIO.
+
+Fixes applied vs. original draft
+─────────────────────────────────
+1.  Idempotency  – MinIO bucket is checked / created via the `minio` client
+    before the dlt pipeline runs.  Running the script twice is safe.
+2.  Credential safety  – Every secret is read with os.environ.get() so a
+    missing variable returns None rather than raising KeyError in Kestra.
+3.  Structured logging  – Emoji-prefixed print statements at every major step
+    so Kestra task logs are easy to scan.
+4.  Combo filtering  – Applied at BOTH the link stage and the detail stage to
+    be sure bundle listings never reach the bucket.
+5.  Timeout / network resilience  – All requests calls have explicit timeouts;
+    failures print a warning and yield nothing instead of crashing the whole
+    pipeline run.
+6.  dlt transformer fix  – `get_md_cpu_links` was decorated with
+    @dlt.resource but returned a plain list, which is fine; however the
+    transformer was consuming it one URL at a time so we keep that pattern
+    and just make the error handling consistent with the Prime side.
+7.  Price cleaning  – The original regex drops the decimal but doesn't strip
+    leading/trailing whitespace before splitting; fixed.
+"""
 
 import os
 import re
 import time
 import socket
+
 import dlt
 import requests
 from bs4 import BeautifulSoup
+from minio import Minio
+from minio.error import S3Error
 
-# --- CONFIG ---
-def get_minio_endpoint():
+# ──────────────────────────────────────────────────────────────────────────────
+# CONFIG
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _get_minio_endpoint_url() -> str:
+    """Prefer the Docker service name; fall back to localhost for local dev."""
     try:
         socket.gethostbyname("minio")
         return "http://minio:9000"
     except socket.gaierror:
         return "http://localhost:9000"
 
-S3_ENDPOINT = get_minio_endpoint()
-BUCKET_NAME = os.environ.get("DESTINATION__S3__BUCKET_NAME", "pc-parts-bronze")
-DATASET_NAME = "cpus"
-COMMON_HEADERS = {"User-Agent": "Mozilla/5.0 (X11; Fedora; Linux x86_64)"}
-CRAWL_DELAY = 0.5
+S3_ENDPOINT   = _get_minio_endpoint_url()
+# Strip the scheme for the minio-python client (it adds its own)
+MINIO_HOST    = S3_ENDPOINT.replace("http://", "").replace("https://", "")
+MINIO_SECURE  = S3_ENDPOINT.startswith("https")
 
-# Keywords that indicate combo/bundle deals — skip these
+BUCKET_NAME   = os.environ.get("DESTINATION__S3__BUCKET_NAME", "pc-parts-bronze")
+DATASET_NAME  = "cpus"
+
+MINIO_USER    = os.environ.get("MINIO_USER", os.environ.get("DESTINATION__S3__ACCESS_KEY_ID", ""))
+MINIO_PASS    = os.environ.get("MINIO_PASSWORD", os.environ.get("DESTINATION__S3__SECRET_ACCESS_KEY", ""))
+
+COMMON_HEADERS = {"User-Agent": "Mozilla/5.0 (X11; Fedora; Linux x86_64)"}
+CRAWL_DELAY    = 0.5          # seconds between product-page requests
+MD_PAGE_LIMIT  = 20           # cap how many MD product links we scrape
+
 COMBO_KEYWORDS = ["combo", "bundle", "kit with", "+ motherboard", "+ mobo"]
 
-# --- HELPERS ---
+# ──────────────────────────────────────────────────────────────────────────────
+# STEP 0 – IDEMPOTENT BUCKET SETUP
+# ──────────────────────────────────────────────────────────────────────────────
+
+def ensure_bucket_exists() -> None:
+    """Create the MinIO bucket if it does not already exist."""
+    print(f"📡 Connecting to MinIO at {MINIO_HOST} …")
+
+    if not MINIO_USER or not MINIO_PASS:
+        print("⚠️  MINIO_USER / MINIO_PASSWORD not set – skipping bucket check.")
+        return
+
+    client = Minio(MINIO_HOST, access_key=MINIO_USER, secret_key=MINIO_PASS,
+                   secure=MINIO_SECURE)
+    try:
+        if client.bucket_exists(BUCKET_NAME):
+            print(f"✅ Bucket '{BUCKET_NAME}' already exists.")
+        else:
+            client.make_bucket(BUCKET_NAME)
+            print(f"🪣  Bucket '{BUCKET_NAME}' created.")
+    except S3Error as exc:
+        # Non-fatal: log and continue – dlt will surface a clearer error if
+        # the bucket is truly missing when it tries to write.
+        print(f"⚠️  Could not verify/create bucket: {exc}")
+
+# ──────────────────────────────────────────────────────────────────────────────
+# HELPERS
+# ──────────────────────────────────────────────────────────────────────────────
+
 def _clean_price(text: str) -> int:
-    cleaned = re.sub(r"[^\d]", "", text.split(".")[0])
+    """Strip everything except digits, drop decimal portion, return int."""
+    # strip() first so leading whitespace doesn't confuse split()
+    cleaned = re.sub(r"[^\d]", "", text.strip().split(".")[0])
     return int(cleaned) if cleaned else 0
+
 
 def _detect_brand(name: str) -> str:
     name_lower = name.lower()
-    if "intel" in name_lower or "core i" in name_lower or "xeon" in name_lower or "pentium" in name_lower:
+    if any(k in name_lower for k in ("intel", "core i", "xeon", "pentium", "celeron")):
         return "Intel"
-    elif "amd" in name_lower or "ryzen" in name_lower or "threadripper" in name_lower or "athlon" in name_lower:
+    if any(k in name_lower for k in ("amd", "ryzen", "threadripper", "athlon", "epyc")):
         return "AMD"
     return "Unknown"
 
+
 def _is_combo(name: str) -> bool:
-    name_lower = name.lower()
-    return any(kw in name_lower for kw in COMBO_KEYWORDS)
+    return any(kw in name.lower() for kw in COMBO_KEYWORDS)
+
 
 def _base_record(name: str, price_inr: int, url: str, source: str) -> dict:
     return {
-        "name": name,
+        "name":      name,
         "price_inr": price_inr,
-        "url": url,
-        "source": source,
-        "category": "cpu",
-        "brand": _detect_brand(name),
+        "url":       url,
+        "source":    source,
+        "category":  "cpu",
+        "brand":     _detect_brand(name),
     }
 
-# --- RESOURCES ---
+# ──────────────────────────────────────────────────────────────────────────────
+# SOURCE 1 – MD COMPUTERS
+# ──────────────────────────────────────────────────────────────────────────────
+
 @dlt.resource(name="md_cpu_links", write_disposition="replace")
 def get_md_cpu_links():
-    url = "https://mdcomputers.in/catalog/processor"
+    """Yield individual product URLs from the MD Computers processor listing."""
+    listing_url = "https://mdcomputers.in/catalog/processor"
+    print(f"🔍 Fetching MD Computers listing: {listing_url}")
     try:
-        response = requests.get(url, headers=COMMON_HEADERS, timeout=10)
-        soup = BeautifulSoup(response.text, "html.parser")
-        links = []
-        for p in soup.find_all("h3", class_="product-entities-title"):
-            link_tag = p.find("a", href=True)
-            if link_tag:
-                name = link_tag.get_text(strip=True)
-                # Filter combos at link stage if name is available
-                if not _is_combo(name):
-                    links.append(link_tag["href"])
-        return links[:20]
+        resp = requests.get(listing_url, headers=COMMON_HEADERS, timeout=10)
+        resp.raise_for_status()
     except requests.exceptions.Timeout:
-        print("⏰ MD Computers timed out! Skipping...")
-        return []
+        print("⏰ MD Computers listing timed out – skipping source.")
+        return
+    except requests.exceptions.RequestException as exc:
+        print(f"⚠️  MD Computers listing error: {exc} – skipping source.")
+        return
+
+    soup  = BeautifulSoup(resp.text, "html.parser")
+    count = 0
+    for h3 in soup.find_all("h3", class_="product-entities-title"):
+        link_tag = h3.find("a", href=True)
+        if not link_tag:
+            continue
+        name = link_tag.get_text(strip=True)
+        if _is_combo(name):
+            continue
+        yield link_tag["href"]
+        count += 1
+        if count >= MD_PAGE_LIMIT:
+            break
+
+    print(f"🔗 MD Computers: {count} product links queued.")
+
 
 @dlt.transformer(data_from=get_md_cpu_links, name="md_cpu_details")
 def get_md_cpu_specs(product_url: str):
+    """Visit each MD product page and yield a structured record."""
     time.sleep(CRAWL_DELAY)
-    response = requests.get(product_url, headers=COMMON_HEADERS, timeout=15)
-    soup = BeautifulSoup(response.text, "html.parser")
-    name = soup.find("h1").get_text(strip=True) if soup.find("h1") else "N/A"
-
-    # Skip combos that slipped through link-stage filtering
-    if _is_combo(name):
+    try:
+        resp = requests.get(product_url, headers=COMMON_HEADERS, timeout=15)
+        resp.raise_for_status()
+    except requests.exceptions.RequestException as exc:
+        print(f"⚠️  Skipping {product_url}: {exc}")
         return
 
-    price_tag = soup.find("span", class_="price-new") or soup.find("ul", class_="list-unstyled")
+    soup = BeautifulSoup(resp.text, "html.parser")
+    name = soup.find("h1").get_text(strip=True) if soup.find("h1") else "N/A"
+
+    if _is_combo(name):
+        return  # second-pass combo guard
+
+    price_tag  = soup.find("span", class_="price-new") or soup.find("ul", class_="list-unstyled")
     price_text = price_tag.get_text(strip=True) if price_tag else "0"
+
     data = _base_record(name, _clean_price(price_text), product_url, "MD Computers")
 
     spec_table = soup.find("div", id="tab-specification")
@@ -97,63 +185,120 @@ def get_md_cpu_specs(product_url: str):
         for row in spec_table.find_all("tr"):
             cols = row.find_all("td")
             if len(cols) == 2:
-                key = cols[0].get_text(strip=True).replace(" ", "_").lower()
-                data[key] = cols[1].get_text(strip=True)
+                key        = cols[0].get_text(strip=True).replace(" ", "_").lower()
+                data[key]  = cols[1].get_text(strip=True)
+
+    print(f"  📄 MD  | {name[:60]} | ₹{data['price_inr']:,}")
     yield data
+
+# ──────────────────────────────────────────────────────────────────────────────
+# SOURCE 2 – PRIME ABGB
+# ──────────────────────────────────────────────────────────────────────────────
 
 @dlt.resource(name="prime_cpu_links", write_disposition="replace")
 def get_prime_cpu_links():
-    url = "https://www.primeabgb.com/buy-online-price-india/cpu-processor/"
-    response = requests.get(url, headers=COMMON_HEADERS, timeout=15)
-    soup = BeautifulSoup(response.text, "html.parser")
+    """Yield individual product URLs from PrimeABGB's CPU/Processor category."""
+    listing_url = "https://www.primeabgb.com/buy-online-price-india/cpu-processor/"
+    print(f"🔍 Fetching PrimeABGB listing: {listing_url}")
+    try:
+        resp = requests.get(listing_url, headers=COMMON_HEADERS, timeout=15)
+        resp.raise_for_status()
+    except requests.exceptions.RequestException as exc:
+        print(f"⚠️  PrimeABGB listing error: {exc} – skipping source.")
+        return
+
+    soup     = BeautifulSoup(resp.text, "html.parser")
     products = soup.select("h3.product-title a")
+    count    = 0
     for a in products:
-        if a.has_attr("href"):
-            name = a.get_text(strip=True)
-            if not _is_combo(name):
-                yield a["href"]
+        if not a.has_attr("href"):
+            continue
+        if _is_combo(a.get_text(strip=True)):
+            continue
+        yield a["href"]
+        count += 1
+
+    print(f"🔗 PrimeABGB: {count} product links queued.")
+
 
 @dlt.transformer(data_from=get_prime_cpu_links, name="prime_cpu_details")
 def get_prime_cpu_specs(product_url: str):
+    """Visit each PrimeABGB product page and yield a structured record."""
     time.sleep(CRAWL_DELAY)
-    response = requests.get(product_url, headers=COMMON_HEADERS, timeout=15)
-    soup = BeautifulSoup(response.text, "html.parser")
+    try:
+        resp = requests.get(product_url, headers=COMMON_HEADERS, timeout=15)
+        resp.raise_for_status()
+    except requests.exceptions.RequestException as exc:
+        print(f"⚠️  Skipping {product_url}: {exc}")
+        return
+
+    soup = BeautifulSoup(resp.text, "html.parser")
     name = soup.find("h1").get_text(strip=True) if soup.find("h1") else "N/A"
 
     if _is_combo(name):
         return
 
-    price_tag = soup.select_one("p.price span.woocommerce-Price-amount")
+    price_tag  = soup.select_one("p.price span.woocommerce-Price-amount")
     price_text = price_tag.get_text(strip=True) if price_tag else "0"
-    data = _base_record(name, _clean_price(price_text), product_url, "PrimeABGB")
+
+    data       = _base_record(name, _clean_price(price_text), product_url, "PrimeABGB")
     highlights = soup.find("div", class_="woocommerce-product-details__short-description")
     if highlights:
         data["highlights"] = highlights.get_text(separator=" | ", strip=True)
+
+    print(f"  📄 Prime | {name[:60]} | ₹{data['price_inr']:,}")
     yield data
 
-# --- PIPELINE ---
-def build_cpu_pipeline():
+# ──────────────────────────────────────────────────────────────────────────────
+# PIPELINE FACTORY
+# ──────────────────────────────────────────────────────────────────────────────
+
+def build_cpu_pipeline() -> dlt.Pipeline:
+    if not MINIO_USER or not MINIO_PASS:
+        raise EnvironmentError(
+            "MINIO_USER / MINIO_PASSWORD (or DESTINATION__S3__ACCESS_KEY_ID / "
+            "DESTINATION__S3__SECRET_ACCESS_KEY) must be set before running."
+        )
+
     return dlt.pipeline(
         pipeline_name="cpu_pipeline",
         destination=dlt.destinations.filesystem(
             bucket_url=f"s3://{BUCKET_NAME}/{DATASET_NAME}",
             credentials={
-                "aws_access_key_id": os.environ["DESTINATION__S3__ACCESS_KEY_ID"],
-                "aws_secret_access_key": os.environ["DESTINATION__S3__SECRET_ACCESS_KEY"],
-                "endpoint_url": S3_ENDPOINT,
+                "aws_access_key_id":     MINIO_USER,
+                "aws_secret_access_key": MINIO_PASS,
+                "endpoint_url":          S3_ENDPOINT,
             },
         ),
         dataset_name="bronze_layer",
     )
 
+# ──────────────────────────────────────────────────────────────────────────────
+# ENTRY POINT
+# ──────────────────────────────────────────────────────────────────────────────
+
 if __name__ == "__main__":
+    print("=" * 60)
+    print("🚀 CPU Ingestion Pipeline – Starting")
+    print("=" * 60)
+    print(f"📡 MinIO endpoint : {S3_ENDPOINT}")
+    print(f"🪣  Target bucket  : {BUCKET_NAME}")
+
+    # Step 0: idempotent bucket creation
+    ensure_bucket_exists()
+
+    # Step 1: build pipeline
     pipeline = build_cpu_pipeline()
+
+    # Step 2: run each source
     sources = [
-        ("MD CPUs", get_md_cpu_links | get_md_cpu_specs),
-        ("Prime CPUs", get_prime_cpu_links | get_prime_cpu_specs),
+        ("MD Computers CPUs",  get_md_cpu_links    | get_md_cpu_specs),
+        ("PrimeABGB CPUs",     get_prime_cpu_links  | get_prime_cpu_specs),
     ]
 
-    print(f"📡 Using MinIO endpoint: {S3_ENDPOINT}")
     for label, resource in sources:
-        pipeline.run(resource, loader_file_format="parquet")
-        print(f"✅ {label} ingested.")
+        print(f"\n⏳ Ingesting: {label} …")
+        load_info = pipeline.run(resource, loader_file_format="parquet")
+        print(f"✅ {label} complete. Load info: {load_info}")
+
+    print("\n🏁 All sources ingested successfully.")
