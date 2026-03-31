@@ -1,0 +1,27 @@
+name: 'pc_market_intelligence'
+version: '1.0.0'
+config-version: 2
+
+# This MUST match the top-level name in your ~/.dbt/profiles.yml
+profile: 'pc_market_intelligence'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  pc_market_intelligence:
+    # This configures your Medallion layers to be created as Views by default
+    bronze:
+      +materialized: view
+    silver:
+      +materialized: view
+    gold:
+      +materialized: table # Gold is usually a table for faster BI performance

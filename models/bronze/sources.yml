@@ -1,0 +1,12 @@
+version: 2
+
+sources:
+  - name: pc_market_sources
+    database: pc_market_intelligence
+    schema: main
+    tables:
+      - name: cpus
+      - name: gpus
+      - name: laptops
+      - name: monitors
+      - name: ram
