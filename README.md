@@ -1,64 +1,18 @@
-# 🚀 PC Market Intelligence Pipeline
+# PC Market Intelligence
 
-### *Automated Data Engineering Platform for Real-time Hardware Analytics*
+## Project Overview
 
-## 📌 Project Overview
-
-This platform automates the collection, transformation, and analysis of PC component pricing from major Indian retailers (MD Computers, Vedant Computers, PrimeABGB, and TheITDepot).
------
-
-## 🏗️ Architecture
-
-The pipeline follows a structured data flow to transform raw web scrapes into actionable market insights:
-
-1.  **Bronze Layer (Raw):** Multi-source scraping using `dlt` and `BeautifulSoup4/Playwright`. Raw Parquet files are stored in a local **MinIO** S3 bucket.
-2.  **Silver Layer (Cleaned):** Data is ingested into **MotherDuck** (DuckDB in the cloud), where schemas are enforced, and prices are normalized into numeric formats.
-3.  **Gold Layer (Analytics):** Business logic ranks laptops and components based on price-to-performance metrics, generating an automated **AI Stock Report**.
+This project help in getting various detailed insights from pc hardware data from reliable indian retailers like MD Computers a helpful tool for pc builders and enthusiasts
 
 -----
 
-## 🛠️ Tech Stack
+## Architecture overivew
 
-  * **Orchestration:** [Kestra](https://kestra.io/) (Docker-based workflow automation)
-  * **Ingestion:** [dlt (Data Load Tool)](https://dlthub.com/)
-  * **Storage (Object):** [MinIO](https://min.io/) (S3-compatible local storage)
-  * **Warehouse:** [MotherDuck](https://motherduck.com/) (Serverless DuckDB)
-  * **Environment:** Docker Compose, uv, Python 3.13
-  * **OS:** Fedora Linux (Optimized for DevSecOps workflows)
+The project follows a structured data flow to transform raw web scraped date into actionable market insights with the implementation of **3 Medallion Architecture**. This project has web scrappers that get real world data from trusted indian retail sites after that the data gets cleaned from various scripts using polars and then it is staged and made model of by leveraging **dbt** then utilizing the model an easy to understand dashboard is made using **evidence.dev**.
 
 -----
 
-## 🚀 Getting Started
-
-### 1\. Prerequisites
-
-  * Docker & Docker Compose
-  * A MotherDuck account and API Token
-  * Fedora Linux (recommended) or any stable Linux distro
-
-### 2\. Environment Setup
-
-Create a `.env` file in the root directory:
-
-```bash
-POSTGRES_USER=kestra
-POSTGRES_PASSWORD=your_password
-MINIO_ROOT_USER=admin
-MINIO_ROOT_PASSWORD=password123
-MOTHERDUCK_TOKEN=your_md_token
-```
-
-### 3\. Deployment
-
-Spin up the entire stack (Database, MinIO, and Kestra) with a single command:
-
-```bash
-docker compose up --build -d
-```
-
-Access the Kestra UI at `http://localhost:8080`.
-
------
+## How to use
 
 ## 📂 Project Structure
 
