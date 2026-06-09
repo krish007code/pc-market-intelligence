@@ -88,8 +88,3 @@ Access the Kestra UI at `http://localhost:8080`.
 **Kavyansh (krish007code)**
   * Focus: Data Engineering | DevSecOps | Linux Systems
 
------
-
-### 💡 Pro-Tip for your Portfolio
-
-When you push this to GitHub, make sure you don't commit your `.venv` or your `.env` file. This README tells a story of **Architecture** and **Systems Design**, which is exactly what top-tier recruiters look for in a 9.37 SGPA student\!
