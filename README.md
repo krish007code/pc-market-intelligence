@@ -14,6 +14,18 @@ The project follows a structured data flow to transform raw web scraped date int
 
 ## How to use
 
+> in terminal
+```bash
+cd
+```
+```bash
+cd pc-market-intelligence
+```
+```bash
+uv run python run_pipeline.py
+```
+> Now please wait accordingly
+ 
 ## 📂 Project Structure
 
 ```text
