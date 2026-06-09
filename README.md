@@ -71,17 +71,10 @@ dbt docs generate && dbt docs serve
 
 -----
 
-## 📈 Key Features
-
-  * **Resilient Ingestion:** Uses `dlt` to handle schema evolution and state management.
-  * **Containerized Execution:** Every task runs in an isolated Docker container managed by Kestra.
-  * **Hybrid Cloud:** Combines local "heavy" storage (MinIO) with cloud-based analytics (MotherDuck).
-  * **Automated Reporting:** Generates AI-driven PDF reports sent via WhatsApp/Email (developed during Hacked 4.0).
-
------
 
 ## 👨‍💻 Author
 
 **Kavyansh (krish007code)**
   * Focus: Analytical Engineering | Data Architectures | Linux Systems
 
+I tried my best to make this if someone found anything that can be imporvised i am happy to hear on **kavyanshkumarbaghel@gmail.com**
