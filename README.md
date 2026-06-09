@@ -25,17 +25,48 @@ cd pc-market-intelligence
 uv run python run_pipeline.py
 ```
 > Now please wait accordingly
- 
+>> if u don't want to invest too much time and need specifically current data previous data is also there as parquet u can just move them in root and skip scrapper part
+
+```bash
+uv run python load_bronze.py
+```
+> move to dashboard
+```bash
+cd dashboard
+```
+> move dahsboard
+```bash
+cp ~/pc-market-intelligence/pc_parts.db ~/pc-market-intelligence/dashboard/pc_parts.db
+```
+> finally run
+```bash
+npm run sources && npm run dev
+```
+> to explore dbt and my schema
+```bash
+cd ..
+```
+```bash
+cd PC_MARKET_INTELLIGENCE/
+```
+```bash
+dbt run && dbt test
+```
+```bash
+dbt docs generate && dbt docs serve
+```
+
 ## 📂 Project Structure
 
 ```text
 .
-├── dbt/                         # SQL Transformation logic (Silver/Gold)
-├── ingestion_script/            # Python scrapers & dlt pipelines
-├── scripts/                     # Helper utilities for PDF generation
-├── docker-compose.yml           # Full infrastructure definition
-├── Dockerfile                   # Custom image for Python-based tasks
-└── .env                         # Sensitive credentials (ignored by git)
+├── PC-MARKET-INTELLIGENCE       # All dbt models are here
+├── ingestion_script/            # web scrapers using beautiful soup with lxml parser 
+├── sync_script/                 # All polars based cleaners that do basic cleaning and casting [bronze layer]
+├── dashboard                    # All file related to evidence.dev dashboard
+├── prev_data                    # All parquet file during time of committing for time saving 
+├── load_bronze.py               # Connecting file for duckDB
+└── run_pipeline.py              # a main runner just run this to run all scripts
 ```
 
 -----
@@ -52,5 +83,5 @@ uv run python run_pipeline.py
 ## 👨‍💻 Author
 
 **Kavyansh (krish007code)**
-  * Focus: Data Engineering | DevSecOps | Linux Systems
+  * Focus: Analytical Engineering | Data Architectures | Linux Systems
 
