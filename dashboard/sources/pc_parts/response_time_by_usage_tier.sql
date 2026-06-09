@@ -1,0 +1,1 @@
+SELECT * FROM main.mart_response_time_by_usage_tier

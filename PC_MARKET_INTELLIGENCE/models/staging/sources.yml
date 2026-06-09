@@ -1,0 +1,12 @@
+version: 2
+
+sources:
+  - name: bronze
+    schema: bronze
+    tables:
+      - name: gpu_sync_cleaned
+      - name: cpu_cooler_cleaned
+      - name: monitor_cleaned
+      - name: motherboard_cleaned
+      - name: processor_cleaned
+      - name: ram_cleaned

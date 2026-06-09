@@ -1,0 +1,1 @@
+SELECT * FROM main.mart_panel_type_vs_price

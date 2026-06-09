@@ -1,0 +1,1 @@
+SELECT * FROM main.mart_gpu_legacy_api

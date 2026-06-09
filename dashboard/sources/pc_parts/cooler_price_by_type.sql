@@ -1,0 +1,1 @@
+SELECT * FROM main.mart_cooler_price_by_type

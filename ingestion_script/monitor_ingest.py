@@ -5,9 +5,9 @@ from loguru import logger
 from tqdm import tqdm
 
 # config
-BASE_URL   = "https://mdcomputers.in/index.php?route=extension/ultimate_filters/module/filter&module_id=3188&stock_status=in&category_id=86"
+BASE_URL   = "https://mdcomputers.in/index.php?route=extension/ultimate_filters/module/filter&module_id=3188&stock_status=in&category_id=91"
 PAGE_PARAM = "%3Bpage%3D5&page={}"
-MAX_PAGES  = 5
+MAX_PAGES  = 9
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (X11; Fedora; Linux x86_64)"}
 DELAY   = 1.5
@@ -24,13 +24,14 @@ def get_product_urls():
             continue                     # ← was missing indentation
 
         soup = BeautifulSoup(resp.text, "lxml")
-        links = [a["href"] for a in soup.select("div.product-grid-item.product-hover-icons.product-with-labels.product-no-swatches a")]
-        
+        links = [a["href"] for a in soup.select("div.product-grid-item.product-hover-icons.product-with-labels a")]
+
         if not links:
-            break          
+            break                       
 
         urls.extend(links)
         time.sleep(DELAY)
+
 
     return urls
 

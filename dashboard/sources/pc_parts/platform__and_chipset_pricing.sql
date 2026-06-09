@@ -1,0 +1,1 @@
+SELECT * FROM main.mart_platform__and_chipset_pricing

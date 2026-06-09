@@ -1,0 +1,85 @@
+version: 2
+
+models:
+  - name: stg_gpu
+    columns:
+      - name: url
+        tests:
+          - unique
+          - not_null
+      - name: price_inr
+        tests:
+          - not_null
+      - name: name
+        tests:
+          - not_null
+
+  - name: stg_cpu_cooler
+    columns:
+      - name: url
+        tests:
+          - unique
+          - not_null
+      - name: price_inr
+        tests:
+          - not_null
+      - name: name
+        tests:
+          - not_null
+      - name: cooling_type
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['AIR COOLER', 'LIQUID AIO COOLER']
+
+  - name: stg_monitor
+    columns:
+      - name: url
+        tests:
+          - unique
+          - not_null
+      - name: price_inr
+        tests:
+          - not_null
+      - name: name
+        tests:
+          - not_null
+
+  - name: stg_motherboard
+    columns:
+      - name: url
+        tests:
+          - unique
+          - not_null
+      - name: price_inr
+        tests:
+          - not_null
+      - name: name
+        tests:
+          - not_null
+
+  - name: stg_processor
+    columns:
+      - name: url
+        tests:
+          - unique
+          - not_null
+      - name: price_inr
+        tests:
+          - not_null
+      - name: name
+        tests:
+          - not_null
+
+  - name: stg_ram
+    columns:
+      - name: url
+        tests:
+          - unique
+          - not_null
+      - name: price_inr
+        tests:
+          - not_null
+      - name: name
+        tests:
+          - not_null

@@ -1,0 +1,1 @@
+SELECT * FROM main.mart_ram_rgb_tax

@@ -1,0 +1,1 @@
+SELECT * FROM main.mart_core_count_vs_price

@@ -1,0 +1,1 @@
+SELECT * FROM main.mart_wireless_adoption_by_price_tier

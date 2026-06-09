@@ -1,0 +1,1 @@
+SELECT * FROM main.mart_screen_size_vs_price_bands

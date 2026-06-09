@@ -30,4 +30,3 @@ logs/runs
 logs/*.log
 *.py[cod]
 logs/queries
-dbt_internal_packages/

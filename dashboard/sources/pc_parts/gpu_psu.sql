@@ -1,0 +1,1 @@
+SELECT * FROM main.mart_gpu_psu_by_chipset

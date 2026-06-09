@@ -1,0 +1,1 @@
+SELECT * FROM main.mart_DDR4_vs_DDR5_pricing

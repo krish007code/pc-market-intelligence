@@ -1,0 +1,1 @@
+SELECT * FROM main.mart_speed_vs_price_within_same_capacity

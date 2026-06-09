@@ -1,0 +1,4 @@
+name: pc_parts
+type: duckdb
+options:
+  filename: pc_parts.db

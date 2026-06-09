@@ -1,0 +1,1 @@
+SELECT * FROM main.mart_unlocked_vs_locked_pricing
