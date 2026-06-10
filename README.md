@@ -88,13 +88,11 @@ Follows **Medallion Architecture** (Bronze → Silver → Gold).
 ├── prev_data/                # Parquet snapshots at time of commit
 ├── load_bronze.py            # Loads parquet files into DuckDB bronze schema
 └── run_pipeline.py           # Master runner — executes full pipeline
-=======
 ├── ingestion_script/            # Python scrapers & dlt pipelines
 ├── scripts/                     # Helper utilities for PDF generation
 ├── docker-compose.yml           # Full infrastructure definition
 ├── Dockerfile                   # Custom image for Python-based tasks
 └── .env                         # Sensitive credentials (ignored by git)
->>>>>>> 10af55b (The project is revamped)
 ```
 
 ---
