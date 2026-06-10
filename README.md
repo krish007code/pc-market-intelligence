@@ -79,8 +79,6 @@ Follows **Medallion Architecture** (Bronze → Silver → Gold).
 ## Project Structure
 
 ```
-.
-<<<<<<< HEAD
 ├── PC_MARKET_INTELLIGENCE/   # dbt project (models, tests, schema.yml)
 ├── ingestion_script/         # Web scrapers (BeautifulSoup + Playwright)
 ├── sync_script/              # Polars cleaning scripts (bronze layer)
