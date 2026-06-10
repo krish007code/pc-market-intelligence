@@ -1,6 +1,5 @@
 SELECT
     name,
-    url,
     response_time_in_ms,
     price_inr,
     DENSE_RANK() OVER (ORDER BY response_time_in_ms ASC) AS response_time_rank

@@ -32,7 +32,7 @@ select * from pc_parts.cooler_sff_options
 ```
 <DataTable
     data={mart_cooler_sff_options}
-    columns={['name', 'url']}
+    columns={['name', 'price_inr']}
 />
 
 ---
