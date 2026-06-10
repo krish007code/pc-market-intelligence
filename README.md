@@ -50,7 +50,7 @@ Polars Cleaning Scripts ──► Parquet files ──► MinIO (Bronze Layer)
   Evidence.dev Dashboard
 ```
 
-Follows **Medallion Architecture** (Bronze → Silver → Gold).
+Follows **Medallion Architecture** (Bronze → Gold via dbt").
 
 ---
 
