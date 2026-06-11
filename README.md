@@ -58,7 +58,7 @@ Follows **Medallion Architecture** (Bronze → Gold via dbt").
 
 | Layer | Tool |
 |---|---|
-| Ingestion | Python, BeautifulSoup, Playwright |
+| Ingestion | Python, BeautifulSoup |
 | Transformation | Polars |
 | Storage | DuckDB, MinIO, Parquet |
 | Modeling | dbt Core (dbt-duckdb) |
@@ -80,7 +80,7 @@ Follows **Medallion Architecture** (Bronze → Gold via dbt").
 
 ```
 ├── PC_MARKET_INTELLIGENCE/   # dbt project (models, tests, schema.yml)
-├── ingestion_script/         # Web scrapers (BeautifulSoup + Playwright)
+├── ingestion_script/         # Web scrapers (BeautifulSoup)
 ├── sync_script/              # Polars cleaning scripts (bronze layer)
 ├── dashboard/                # Evidence.dev dashboard
 ├── prev_data/                # Parquet snapshots at time of commit
